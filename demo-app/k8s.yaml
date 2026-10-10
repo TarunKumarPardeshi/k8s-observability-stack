@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-telemetry-app
+  namespace: default
+  labels:
+    app: demo-telemetry-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: demo-telemetry-app
+  template:
+    metadata:
+      labels:
+        app: demo-telemetry-app
+    spec:
+      containers:
+        - name: app
+          image: python:3.12-slim
+          command: ["sh", "-c", "pip install flask prometheus_client && python -c 'from app import app; app.run(host=\"0.0.0.0\", port=8000)'"]
+          ports:
+            - containerPort: 8000
+              name: http-metrics
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-telemetry-app
+  namespace: default
+  labels:
+    app: demo-telemetry-app
+spec:
+  type: ClusterIP
+  selector:
+    app: demo-telemetry-app
+  ports:
+    - name: http-metrics
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: demo-telemetry-app-monitor
+  namespace: default
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: demo-telemetry-app
+  endpoints:
+    - port: http-metrics
+      path: /metrics
+      interval: 15s

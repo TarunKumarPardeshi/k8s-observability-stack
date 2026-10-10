@@ -1,0 +1,48 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: sre-golden-signals-rules
+  namespace: monitoring
+  labels:
+    role: alert-rules
+    release: prometheus
+spec:
+  groups:
+    - name: application-golden-signals
+      rules:
+        # High Error Rate Alert (> 5% for 2 minutes)
+        - alert: HighHttpErrorRate
+          expr: |
+            (sum(rate(demo_requests_total{status=~"5.."}[2m])) by (service, namespace)
+            /
+            sum(rate(demo_requests_total[2m])) by (service, namespace)) * 100 > 5
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Elevated HTTP 5xx error rate on {{ $labels.service }}"
+            description: "Service {{ $labels.service }} has error rate of {{ $value | printf \"%.2f\" }}% (> 5% threshold)."
+            runbook_url: "https://github.com/TarunKumarPardeshi/k8s-observability-stack#runbooks"
+
+        # P99 Latency Alert (> 500ms for 5 minutes)
+        - alert: HighP99Latency
+          expr: |
+            histogram_quantile(0.99, sum(rate(demo_request_duration_seconds_bucket[5m])) by (le, service, namespace)) > 0.500
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High P99 latency on {{ $labels.service }}"
+            description: "Service {{ $labels.service }} P99 latency is {{ $value | printf \"%.3f\" }}s (> 500ms)."
+            runbook_url: "https://github.com/TarunKumarPardeshi/k8s-observability-stack#runbooks"
+
+        # Pod CrashLooping Alert
+        - alert: PodCrashLooping
+          expr: rate(kube_pod_container_status_restarts_total[5m]) * 60 > 2
+          for: 3m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Pod {{ $labels.pod }} is crash looping"
+            description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is restarting rapidly."
+            runbook_url: "https://github.com/TarunKumarPardeshi/k8s-observability-stack#runbooks"

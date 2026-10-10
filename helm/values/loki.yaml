@@ -1,1 +1,38 @@
-# Helm value overrides for loki-stack
+# Helm values for Grafana Loki Stack (Loki + Promtail)
+loki:
+  enabled: true
+  isDefault: true
+  persistence:
+    enabled: true
+    size: 10Gi
+  config:
+    limits_config:
+      max_entries_limit_per_query: 5000
+      reject_old_samples: true
+      reject_old_samples_max_age: 168h
+      retention_period: 168h # 7 days retention
+    table_manager:
+      retention_deletes_enabled: true
+      retention_period: 168h
+
+promtail:
+  enabled: true
+  config:
+    lokiAddress: http://loki:3100/loki/api/v1/push
+    snippets:
+      pipelineStages:
+        - docker: {}
+        - json:
+            expressions:
+              level: level
+              msg: message
+              service: service
+
+grafana:
+  enabled: false # Handled by kube-prometheus-stack
+prometheus:
+  enabled: false # Handled by kube-prometheus-stack
+filebeat:
+  enabled: false
+logstash:
+  enabled: false
